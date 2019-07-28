@@ -5,6 +5,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -67,7 +68,7 @@ static const char *normbgcolor = NULL;
 static const char *normfgcolor = NULL;
 static const char *selbgcolor  = NULL;
 static const char *selfgcolor  = NULL;
-static const char *dimcolor = NULL; 
+static const char *dimcolor = NULL;
 static const char *undercolor = NULL;
 static char *name = "dmenu";
 static char *class = "Dmenu";
@@ -87,6 +88,7 @@ static Atom clip, utf8;
 static Bool topbar = True;
 static Bool running = True;
 static Bool filter = False;
+static Bool alttab = False;
 static Bool maskin = False;
 static Bool noinput = False;
 static int ret = 0;
@@ -133,6 +135,8 @@ main(int argc, char *argv[]) {
 			match = matchfuzzy;
  		else if(!strcmp(argv[i], "-r"))
  			filter = True;
+ 		else if(!strcmp(argv[i], "-alttab"))
+ 			alttab = True;
 		else if(!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
@@ -171,7 +175,7 @@ main(int argc, char *argv[]) {
 		else if (!strcmp(argv[i], "-o"))  /* opacity */
 			opacity = atof(argv[++i]);
 		else if (!strcmp(argv[i], "-dim"))  /* dim opacity */
-			dimopacity = atof(argv[++i]);	
+			dimopacity = atof(argv[++i]);
 		else if (!strcmp(argv[i], "-dc")) /* dim color */
 			dimcolor = argv[++i];
 		else if (!strcmp(argv[i], "-uc")) /* underline color */
@@ -384,7 +388,7 @@ drawmenu(void) {
 		drawrect(dc, curpos, (dc->h - dc->font.height)/2 + 1, 1, dc->font.height -1, True, normcol->FG);
 
 
-    if(!quiet || strlen(text) > 0) {    
+    if(!quiet || strlen(text) > 0) {
         if(lines > 0) {
             /* draw vertical list */
             dc->w = mw - dc->x;
@@ -442,6 +446,53 @@ insert(const char *str, ssize_t n) {
 	match();
 }
 
+static void
+keyrelease(XKeyEvent *ev)
+{
+	char buf[32];
+	int len;
+	Status status;
+
+    if (!alttab) {
+        return;
+    }
+
+
+    // For posterity
+    // This is not correct. ksym is basically telling us what all keys were pressed before the release event
+    // Our logic is that if the *only* key pressed was an alt key, and we got a release event,
+    // then the alt key must have been released.
+    // But I'd like for it to also fire while the shift key is held for example. As it stands, alt
+    // needs to have been the only pressed key before the release event happens
+    /*len = XLookupString(ev, buf, sizeof buf, &ksym, &status);*/
+
+    // The keycode is the key that was released
+	KeySym ksym = XKeycodeToKeysym(ev->display, ev->keycode, 0);
+
+    printf("status=%d, type=%d, keycode=%d, alt=%d alt_l=%d shift_r=%d ksym=%d ksymmask=%d mask2=%d state=%d\n", status, ev->type, ev->keycode, Mod1Mask, XK_Alt_L, XK_Shift_R, ksym, ~(XK_Shift_R) & ksym, ~(XK_Alt_L) & ksym, XKeycodeToKeysym(ev->display, 64, 0));
+    /*if (alttab && Mod1Mask & ev->state) {*/
+
+    /*if (XK_Alt_L & ksym == XK_Alt_L || XK_Alt_R & ksym == XK_Alt_R) {*/
+    if (XK_Alt_L == ksym || XK_Alt_R == ksym) {
+ 		if((ev->state & ShiftMask) || !sel){
+ 			puts(text);
+ 			writehistory(text);
+ 		}
+ 		else if(!filter){
+ 			puts(sel->text);
+ 			writehistory(sel->text);
+ 		}
+ 		else {
+ 			for(Item *item = sel; item; item = item->right)
+ 				puts(item->text);
+ 			for(Item *item = matches; item != sel; item = item->right)
+ 				puts(item->text);
+ 		}
+		ret = EXIT_SUCCESS;
+		running = False;
+    }
+}
+
 void
 keypress(XKeyEvent *ev) {
 	char buf[32];
@@ -491,8 +542,15 @@ keypress(XKeyEvent *ev) {
 		default:
 			return;
 		}
+    else if(ev->state & ShiftMask)
+        switch(ksym) {
+        case XK_ISO_Left_Tab: if (alttab) { ksym = XK_Left;  break; }
+        case XK_Tab: if (alttab) { ksym = XK_Left;  break; }
+        }
 	else if(ev->state & Mod1Mask)
 		switch(ksym) {
+        case XK_ISO_Left_Tab: if (alttab) { ksym = XK_Right;  break; }
+        case XK_Tab: if (alttab) { ksym = XK_Right;  break; }
 		case XK_g: ksym = XK_Home;  break;
 		case XK_G: ksym = XK_End;   break;
 		case XK_h: ksym = XK_Up;    break;
@@ -605,6 +663,7 @@ keypress(XKeyEvent *ev) {
 	case XK_Tab:
 		if(!sel)
 			return;
+        printf("got tab\n");
 		if(strcmp(text, sel->text)) {
 			strncpy(originaltext, text, sizeof originaltext);
 			strncpy(text, sel->text, sizeof text);
@@ -625,6 +684,7 @@ keypress(XKeyEvent *ev) {
 	case XK_ISO_Left_Tab:
 		if(!sel)
 			return;
+        printf("got ltab\n");
 		if(strcmp(text, sel->text)) {
 			sel = matchend;
 			strncpy(originaltext, text, sizeof originaltext);
@@ -641,7 +701,7 @@ keypress(XKeyEvent *ev) {
 				cursor = strlen(text);
 				match();
 			}
-		} 
+		}
 		break;
 	}
 	drawmenu();
@@ -750,7 +810,7 @@ matchfuzzy(void) {
 	size_t len;
 	Item *item;
 	char *pos;
-	
+
 	len = strlen(text);
 	matches = matchend = NULL;
 	for(item = items; item && item->text; item++) {
@@ -862,19 +922,76 @@ readitems(void) {
   lines = MIN(lines, s.items);
 }
 
+int
+isKeyHeld(int keyCode, char *buf) {
+    int byte = keyCode / 8;
+    int rem = keyCode % 8;
+    int mask = 1 << (8 - rem);
+    return buf[byte] & mask > 0;
+}
+
+int
+checkAltKeysHeld(Display *display) {
+    if (!alttab) {
+        return;
+    }
+    char buf[32];
+    int altL = XKeysymToKeycode(display, XK_Alt_L);
+    int altR = XKeysymToKeycode(display, XK_Alt_R);
+    XQueryKeymap(display, &buf);
+    if (!isKeyHeld(altL, buf) && !isKeyHeld(altR, buf)) {
+         /*if((ev->state & ShiftMask) || !sel){*/
+             /*puts(text);*/
+             /*writehistory(text);*/
+         /*}*/
+         /*else if(!filter){*/
+        puts(sel->text);
+        writehistory(sel->text);
+         /*}*/
+         /*else {*/
+             /*for(Item *item = sel; item; item = item->right)*/
+                 /*puts(item->text);*/
+             /*for(Item *item = matches; item != sel; item = item->right)*/
+                 /*puts(item->text);*/
+         /*}*/
+		ret = EXIT_SUCCESS;
+		running = False;
+    }
+}
+
 void
 run(void) {
 	XEvent ev;
+    Bool init = True;
 
 	while(running && !XNextEvent(dc->dpy, &ev)) {
+        if (init) {
+            init = False;
+            if (alttab) {
+                if(sel && sel->right && (sel = sel->right) == next) {
+                    curr = next;
+                    calcoffsets();
+                }
+                drawmenu();
+
+                checkAltKeysHeld(ev.xany.display);
+            }
+        }
+
 		if(XFilterEvent(&ev, win))
 			continue;
+
 		switch(ev.type) {
 		case Expose:
 			if(ev.xexpose.count == 0)
 				mapdc(dc, win, mw, mh);
 			break;
+		case KeyRelease:
+			keyrelease(&ev.xkey);
+			break;
 		case KeyPress:
+            printf("got keypress\n");
+            fflush(stdout);
 			keypress(&ev.xkey);
 			break;
 		case SelectionNotify:
@@ -921,7 +1038,7 @@ setup(void) {
 			x = info[snum].x_org;
 			y = info[snum].y_org + (topbar ? yoffset : info[i].height - mh - yoffset);
 			mw = info[snum].width;
-			
+
 			dimx = info[snum].x_org;
 			dimy = info[snum].y_org;
 			dimw = info[snum].width;
@@ -966,10 +1083,10 @@ setup(void) {
 		x = 0;
 		y = topbar ? 0 : DisplayHeight(dc->dpy, screen) - mh - yoffset;
 		mw = DisplayWidth(dc->dpy, screen);
-		
+
 		dimx = 0;
 		dimy = 0;
-		dimw = WidthOfScreen(defScreen); 
+		dimw = WidthOfScreen(defScreen);
 		dimh = HeightOfScreen(defScreen);
 	}
 
@@ -978,9 +1095,9 @@ setup(void) {
 	promptw = (prompt && *prompt) ? textw(dc, prompt) : 0;
 	inputw = MIN(inputw, mw/3);
 	match();
-	
+
 	swa.override_redirect = True;
-	
+
 	/* create dim window */
 	if(dimopacity > 0) {
 		swa.background_pixel = dimcol->BG;
@@ -991,16 +1108,16 @@ setup(void) {
 	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
 		XClassHint dimhint = { .res_name = dimname, .res_class = class };
   	XSetClassHint(dc->dpy, dim, &dimhint);
-  
+
 		dimopacity = MIN(MAX(dimopacity, 0), 1);
   	unsigned int dimopacity_set = (unsigned int)(dimopacity * OPAQUE);
   	XChangeProperty(dc->dpy, dim, XInternAtom(dc->dpy, OPACITY, False),
 											XA_CARDINAL, 32, PropModeReplace,
 											(unsigned char *) &dimopacity_set, 1L);
-	
+
 		XMapRaised(dc->dpy, dim);
 	}
-	
+
 	/* create menu window */
 	swa.background_pixel = normcol->BG;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
@@ -1016,7 +1133,7 @@ setup(void) {
   XChangeProperty(dc->dpy, win, XInternAtom(dc->dpy, OPACITY, False),
 											XA_CARDINAL, 32, PropModeReplace,
 											(unsigned char *) &opacity_set, 1L);
-	
+
 	/* open input methods */
 	xim = XOpenIM(dc->dpy, NULL, NULL, NULL);
 	xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
