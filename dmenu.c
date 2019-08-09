@@ -469,7 +469,6 @@ keyrelease(XKeyEvent *ev)
     // The keycode is the key that was released
 	KeySym ksym = XKeycodeToKeysym(ev->display, ev->keycode, 0);
 
-    printf("status=%d, type=%d, keycode=%d, alt=%d alt_l=%d shift_r=%d ksym=%d ksymmask=%d mask2=%d state=%d\n", status, ev->type, ev->keycode, Mod1Mask, XK_Alt_L, XK_Shift_R, ksym, ~(XK_Shift_R) & ksym, ~(XK_Alt_L) & ksym, XKeycodeToKeysym(ev->display, 64, 0));
     /*if (alttab && Mod1Mask & ev->state) {*/
 
     /*if (XK_Alt_L & ksym == XK_Alt_L || XK_Alt_R & ksym == XK_Alt_R) {*/
@@ -655,7 +654,6 @@ keypress(XKeyEvent *ev) {
 			return;
 		/* fallthrough */
 	case XK_Down:
-        printf("got down\n");
 		if(sel && sel->right && (sel = sel->right) == next) {
 			curr = next;
 			calcoffsets();
@@ -664,7 +662,6 @@ keypress(XKeyEvent *ev) {
 	case XK_Tab:
 		if(!sel)
 			return;
-        printf("got tab\n");
 		if(strcmp(text, sel->text)) {
 			strncpy(originaltext, text, sizeof originaltext);
 			strncpy(text, sel->text, sizeof text);
@@ -685,7 +682,6 @@ keypress(XKeyEvent *ev) {
 	case XK_ISO_Left_Tab:
 		if(!sel)
 			return;
-        printf("got ltab\n");
 		if(strcmp(text, sel->text)) {
 			sel = matchend;
 			strncpy(originaltext, text, sizeof originaltext);
@@ -991,7 +987,6 @@ run(void) {
 			keyrelease(&ev.xkey);
 			break;
 		case KeyPress:
-            printf("got keypress\n");
             fflush(stdout);
 			keypress(&ev.xkey);
 			break;
