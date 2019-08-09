@@ -544,13 +544,13 @@ keypress(XKeyEvent *ev) {
 		}
     else if(ev->state & ShiftMask)
         switch(ksym) {
-        case XK_ISO_Left_Tab: if (alttab) { ksym = XK_Left;  break; }
-        case XK_Tab: if (alttab) { ksym = XK_Left;  break; }
+        case XK_ISO_Left_Tab: if (alttab) { ksym = XK_Up;  break; }
+        case XK_Tab: if (alttab) { ksym = XK_Up;  break; }
         }
 	else if(ev->state & Mod1Mask)
 		switch(ksym) {
-        case XK_ISO_Left_Tab: if (alttab) { ksym = XK_Right;  break; }
-        case XK_Tab: if (alttab) { ksym = XK_Right;  break; }
+        case XK_ISO_Left_Tab: if (alttab) { ksym = XK_Down;  break; }
+        case XK_Tab: if (alttab) { ksym = XK_Down;  break; }
 		case XK_g: ksym = XK_Home;  break;
 		case XK_G: ksym = XK_End;   break;
 		case XK_h: ksym = XK_Up;    break;
@@ -655,6 +655,7 @@ keypress(XKeyEvent *ev) {
 			return;
 		/* fallthrough */
 	case XK_Down:
+        printf("got down\n");
 		if(sel && sel->right && (sel = sel->right) == next) {
 			curr = next;
 			calcoffsets();
