@@ -2,7 +2,7 @@
 VERSION = 0.1
 
 # paths
-PREFIX = /home/catbug/dmenu2/build
+PREFIX = /usr
 MANPREFIX = ${PREFIX}/share/man
 
 X11INC = /usr/X11R6/include

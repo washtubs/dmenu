@@ -89,6 +89,7 @@ static Bool topbar = True;
 static Bool running = True;
 static Bool filter = False;
 static Bool alttab = False;
+static int advance = 1;
 static Bool maskin = False;
 static Bool noinput = False;
 static int ret = 0;
@@ -135,8 +136,6 @@ main(int argc, char *argv[]) {
 			match = matchfuzzy;
  		else if(!strcmp(argv[i], "-r"))
  			filter = True;
- 		else if(!strcmp(argv[i], "-alttab"))
- 			alttab = True;
 		else if(!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
@@ -164,6 +163,10 @@ main(int argc, char *argv[]) {
 			line_height = atoi(argv[++i]);
 		else if(!strcmp(argv[i], "-uh"))   /* height of underline */
 			under_height = atoi(argv[++i]);
+ 		else if(!strcmp(argv[i], "-alttab")) {
+ 			alttab = True;
+ 			advance = atoi(argv[++i]);
+        }
 		#ifdef XINERAMA
 		else if(!strcmp(argv[i], "-s"))   /* screen number for dmenu to appear in */
 			snum = atoi(argv[++i]);
@@ -965,9 +968,12 @@ run(void) {
         if (init) {
             init = False;
             if (alttab) {
-                if(sel && sel->right && (sel = sel->right) == next) {
-                    curr = next;
-                    calcoffsets();
+                while (advance > 0) {
+                    if(sel && sel->right && (sel = sel->right) == next) {
+                        curr = next;
+                        calcoffsets();
+                    }
+                    advance--;
                 }
                 drawmenu();
 
