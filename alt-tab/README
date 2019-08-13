@@ -1,0 +1,31 @@
+Dmenu: Alt-tab mode
+===================
+
+The provided shell script and dmenu modifications allow for an alt-tab UX similar to windows
+except entirely scriptable.
+
+The alt-tab script expects 2 parameters, an input script to feed options and a reply script to
+process the user's selection.
+
+    ./alt-tab.sh ./sample_in.sh ./sample_reply.sh
+
+This should be bound to Alt+Tab through your window manager
+
+In the same vein as other suckless utilities, this script is intended to be modified to your
+liking, not necessarily installed vanilla.
+
+Inner workings
+--------------
+
+The shell script is intended to handle a potentially long running input script that may end after
+the user has already hit Tab multiple times. We don't start dmenu until the input is completely
+recieved, so we track tab presses inside the shell script.
+
+The initial execution will grab an exclusive lock in /tmp/alt-tab (or $ALT_TAB_MUTEX if provided),
+and execute the input script.
+
+Subsequent executions will fail to grab the lock and instead increment the value in /tmp/alt-tab/advance
+which uses a separate exclusive lock.
+
+Once the initial execution completes it will grab the value from /tmp/alt-tab/advance
+and use that to start dmenu pre-advanced, so none of the user's tab presses are lost.
